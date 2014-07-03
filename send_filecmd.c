@@ -1,4 +1,4 @@
-#include<gtk/gtk.h>
+#include <gtk/gtk.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -48,13 +48,12 @@ static int init_hotplug_sock ( void )
     return hotplug_sock ;
 }
 
-int connectsocket()
+int connectsocket(int portnum)
 {
 
     struct sockaddr_in s_add,c_add;
     int sin_size;
     int cfd = socket(AF_INET, SOCK_STREAM, 0);
-    int portnum = 8699; 
     if(-1 == cfd)
     {
         printf("socket fail ! \r\n");
@@ -74,7 +73,7 @@ int connectsocket()
     return cfd;
 }
 
-static GtkWidget* entry1;
+GtkWidget *combo;
 char *arg_file;
 
 void on_button_clicked (GtkWidget* button,gpointer data)
@@ -86,6 +85,7 @@ void on_button_clicked (GtkWidget* button,gpointer data)
     if ((int)data == 1)
     {
         printf("arg:%s\n",arg_file);
+	printf("%s\n",gtk_entry_get_text(GTK_ENTRY(GTK_COMBO(combo)->entry)));
         gtk_widget_destroy(window);
         return;
     }
@@ -96,8 +96,8 @@ void on_button_clicked (GtkWidget* button,gpointer data)
         char buffer[1024]={0};   
         char cmd[1024]={0};
         char send1[20]={0},send2[20]={0};
-        const gchar* vm_name = gtk_entry_get_text(GTK_ENTRY(entry1));
-        cfd = connectsocket();
+        const gchar* vm_name = gtk_entry_get_text(GTK_ENTRY(GTK_COMBO(combo)->entry));
+        cfd = connectsocket(8699);
         strcat(send1,"send1 ");
         strcat(send1,vm_name);
         if(-1 == write(cfd,send1,strlen(send1)))
@@ -134,7 +134,7 @@ void on_button_clicked (GtkWidget* button,gpointer data)
         system(cmd);
 	sleep(3);
         system("umount /media/EXCHANGE");
-        cfd = connectsocket();
+        cfd = connectsocket(8699);
         if(cfd!=-1)
         {
             strcat(send2,"send2 ");
@@ -170,6 +170,36 @@ int main(int argc,char* argv[])
     GtkWidget* button;
     GtkWidget* sep;
     arg_file = argv[1];
+
+    GtkWidget *vbox;
+    GList *items = NULL;
+    char rec_buf[200]={0};
+
+    int cfd = connectsocket(8699);
+    if(-1 == write(cfd, "*#", 2))
+    {
+	    printf("write fail!\r\n");
+	    gtk_widget_destroy(window);
+	    return;
+    }
+
+    recv (cfd , &rec_buf, 200, 0); //"vmname1 vmname2 vmname3 "
+    printf("start rec:%s\n",rec_buf);
+    close(cfd);
+    char *p1=rec_buf,*p2;
+    while(*p1)
+    {
+	    p2=strstr(p1," ");
+	    *p2=0;
+	    items =g_list_append(items,p1);
+	    p1=p2+1;
+
+    }
+   // items =g_list_append(items,"列表项A");
+   // items =g_list_append(items,"列表项B");
+   // items =g_list_append(items,"列表项C");
+   // items =g_list_append(items,"列表项D");
+   // items =g_list_append(items,"列表项E");
     //初始化
     gtk_init(&argc,&argv);
     //设置窗口
@@ -190,11 +220,19 @@ int main(int argc,char* argv[])
     box3 = gtk_hbox_new(FALSE,0);
     gtk_box_pack_start(GTK_BOX(box),box3,TRUE,TRUE,5);
 
+    //vbox = gtk_vbox_new(FALSE,0);
+    //gtk_box_pack_start(GTK_BOX(box),vbox,TRUE,TRUE,5);
+    //combo = gtk_combo_new();
+    //gtk_box_pack_start(GTK_BOX(vbox),combo,FALSE,FALSE,5);
+    //gtk_combo_set_popdown_strings(GTK_COMBO(combo),items);
 
     label1 = gtk_label_new("VM Name ：");
-    entry1 = gtk_entry_new();
+    //entry1 = gtk_entry_new();
+    combo = gtk_combo_new();
     gtk_box_pack_start(GTK_BOX(box1),label1,FALSE,FALSE,5);
-    gtk_box_pack_start(GTK_BOX(box1),entry1,FALSE,FALSE,5);
+    gtk_box_pack_start(GTK_BOX(box1),combo,FALSE,FALSE,5);
+    gtk_combo_set_popdown_strings(GTK_COMBO(combo),items);
+    //gtk_box_pack_start(GTK_BOX(box1),entry1,FALSE,FALSE,5);
 
     button = gtk_button_new_with_label("Send");
     g_signal_connect(G_OBJECT(button),"clicked",G_CALLBACK(on_button_clicked),(gpointer)2);
@@ -205,6 +243,7 @@ int main(int argc,char* argv[])
     g_signal_connect(G_OBJECT(button),"clicked",G_CALLBACK(on_button_clicked),(gpointer)1);
     // g_signal_connect_swapped(G_OBJECT(button),"clicked",G_CALLBACK(gtk_widget_destroy),window);
     gtk_box_pack_start(GTK_BOX(box3),button,TRUE,TRUE,5);
+
     gtk_widget_show(button);
 
     gtk_widget_show_all(window);
