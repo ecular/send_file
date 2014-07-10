@@ -84,10 +84,14 @@ void on_button_clicked (GtkWidget* button,gpointer data)
      */
     if ((int)data == 1)
     {
-        printf("arg:%s\n",arg_file);
-	printf("%s\n",gtk_entry_get_text(GTK_ENTRY(GTK_COMBO(combo)->entry)));
-        gtk_widget_destroy(window);
-        return;
+	    GtkWidget *dialog = gtk_message_dialog_new((gpointer)window,GTK_DIALOG_DESTROY_WITH_PARENT,GTK_MESSAGE_WARNING,GTK_BUTTONS_OK,"Unallowed Operation");
+	    gtk_window_set_title(GTK_WINDOW(dialog), "Warning");
+	    gtk_dialog_run(GTK_DIALOG(dialog));
+	    gtk_widget_destroy(dialog);
+	    printf("arg:%s\n",arg_file);
+	    printf("%s\n",gtk_entry_get_text(GTK_ENTRY(GTK_COMBO(combo)->entry)));
+	    gtk_widget_destroy(window);
+	    return;
     }
     if ((int)data == 2)
     {
