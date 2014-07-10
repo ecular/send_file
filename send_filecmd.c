@@ -16,6 +16,12 @@
 #define UEVENT_BUFFER_SIZE       2048
 
 GtkWidget* window;
+GtkWidget* button_send;
+GtkWidget* button_cancel;
+GtkWidget* pbar;
+pthread_t thread_operate;
+GtkWidget *combo;
+char *arg_file;
 
 static int init_hotplug_sock ( void )
 {
@@ -73,21 +79,83 @@ int connectsocket(int portnum)
     return cfd;
 }
 
-GtkWidget *combo;
-char *arg_file;
+
+
+gint progress_timeout(gpointer pbardata)
+{
+	GtkWidget *pbar = (GtkWidget *)pbardata;
+	gtk_progress_bar_pulse(GTK_PROGRESS_BAR(pbar));
+	return TRUE;
+}
+
+void showMessageBox()
+{
+	GtkWidget *dialog = gtk_message_dialog_new((gpointer)window,GTK_DIALOG_DESTROY_WITH_PARENT,GTK_MESSAGE_WARNING,GTK_BUTTONS_OK,"Unallowed Operation");
+	gtk_window_set_title(GTK_WINDOW(dialog), "Warning");
+	gtk_dialog_run(GTK_DIALOG(dialog));
+	gtk_widget_destroy(dialog);
+}
+
+void *operate_file(void *dummy)
+{
+        int cfd;
+        int recbytes;
+        char buffer[1024]={0};   
+        char cmd[1024]={0};
+        char send1[20]={0},send2[20]={0};
+	int hotplug_sock  = init_hotplug_sock ();
+        const gchar* vm_name = gtk_entry_get_text(GTK_ENTRY(GTK_COMBO(combo)->entry));
+	while (1)
+	{
+		char buf[UEVENT_BUFFER_SIZE *2] = {0};
+		recv (hotplug_sock , &buf, sizeof (buf), 0); 
+		if(sizeof(buf)>0)
+			break;
+	}
+	sleep(5);
+	strcat(cmd,"cp ");
+	strcat(cmd,arg_file);
+	strcat(cmd," /media/EXCHANGE");
+	system(cmd);
+	sleep(3);
+	system("umount /media/EXCHANGE");
+	cfd = connectsocket(8699);
+	if(cfd!=-1)
+	{
+		strcat(send2,"send2 ");
+		strcat(send2,vm_name);
+		if(-1 == write(cfd,send2,strlen(send2)))
+		{
+			printf("write fail!\r\n");
+			gtk_widget_destroy(window);
+			return;
+		}
+	}
+	else
+	{
+		printf("connect error!");
+		gtk_widget_destroy(window);
+		return;
+	}
+	close(cfd);
+	gtk_widget_destroy(window);
+	return;
+}
 
 void on_button_clicked (GtkWidget* button,gpointer data)
 {
+
+	gtk_widget_set_sensitive(combo,FALSE);
+
+	gtk_widget_set_sensitive(button_send,FALSE);
+	gtk_widget_set_sensitive(button_cancel,FALSE);
+	gtk_button_set_label(GTK_BUTTON(button_send),"Sending");
     /*
      *const gchar *gtk_entry_get_text(GtkEntry *entry)
      *     获得当前文本输入构件的内容
      */
     if ((int)data == 1)
     {
-	    GtkWidget *dialog = gtk_message_dialog_new((gpointer)window,GTK_DIALOG_DESTROY_WITH_PARENT,GTK_MESSAGE_WARNING,GTK_BUTTONS_OK,"Unallowed Operation");
-	    gtk_window_set_title(GTK_WINDOW(dialog), "Warning");
-	    gtk_dialog_run(GTK_DIALOG(dialog));
-	    gtk_widget_destroy(dialog);
 	    printf("arg:%s\n",arg_file);
 	    printf("%s\n",gtk_entry_get_text(GTK_ENTRY(GTK_COMBO(combo)->entry)));
 	    gtk_widget_destroy(window);
@@ -117,47 +185,50 @@ void on_button_clicked (GtkWidget* button,gpointer data)
 
         if(strcmp(buffer,"NO") == 0)
         {
+	    showMessageBox();
             printf("Now Close this Application.\n");
             gtk_widget_destroy(window);
             return;
             printf("Closed!\n");
         }
 
-        int hotplug_sock  = init_hotplug_sock ();
-        while (1)
-        {
-            char buf [UEVENT_BUFFER_SIZE *2] = {0};
-            recv (hotplug_sock , &buf, sizeof (buf), 0); 
-            if(sizeof(buf)>0)
-                break;
-        }
-        sleep(5);
-        strcat(cmd,"cp ");
-        strcat(cmd,arg_file);
-        strcat(cmd," /media/EXCHANGE");
-        system(cmd);
-	sleep(3);
-        system("umount /media/EXCHANGE");
-        cfd = connectsocket(8699);
-        if(cfd!=-1)
-        {
-            strcat(send2,"send2 ");
-            strcat(send2,vm_name);
-            if(-1 == write(cfd,send2,strlen(send2)))
-            {
-                printf("write fail!\r\n");
-                gtk_widget_destroy(window);
-                return;
-            }
-        }
-        else
-        {
-            printf("connect error!");
-            gtk_widget_destroy(window);
-            return;
-        }
-        close(cfd);
-        gtk_widget_destroy(window);
+	GtkWidget *timer = gtk_timeout_add(100,progress_timeout,pbar);
+	pthread_create(&thread_operate, NULL, operate_file, NULL);
+//        int hotplug_sock  = init_hotplug_sock ();
+//        while (1)
+//        {
+//            char buf [UEVENT_BUFFER_SIZE *2] = {0};
+//            recv (hotplug_sock , &buf, sizeof (buf), 0); 
+//            if(sizeof(buf)>0)
+//                break;
+//        }
+//        sleep(5);
+//        strcat(cmd,"cp ");
+//        strcat(cmd,arg_file);
+//        strcat(cmd," /media/EXCHANGE");
+//        system(cmd);
+//	sleep(3);
+//        system("umount /media/EXCHANGE");
+//        cfd = connectsocket(8699);
+//        if(cfd!=-1)
+//        {
+//            strcat(send2,"send2 ");
+//            strcat(send2,vm_name);
+//            if(-1 == write(cfd,send2,strlen(send2)))
+//            {
+//                printf("write fail!\r\n");
+//                gtk_widget_destroy(window);
+//                return;
+//            }
+//        }
+//        else
+//        {
+//            printf("connect error!");
+//            gtk_widget_destroy(window);
+//            return;
+//        }
+//        close(cfd);
+//        gtk_widget_destroy(window);
         return;
     }
 
@@ -170,9 +241,10 @@ int main(int argc,char* argv[])
     GtkWidget* box1;
     GtkWidget* box2;
     GtkWidget* box3;
+    GtkWidget* box4;
     GtkWidget* label1;
-    GtkWidget* button;
     GtkWidget* sep;
+    GtkWidget* timer;
     arg_file = argv[1];
 
     GtkWidget *vbox;
@@ -199,11 +271,7 @@ int main(int argc,char* argv[])
 	    p1=p2+1;
 
     }
-   // items =g_list_append(items,"列表项A");
-   // items =g_list_append(items,"列表项B");
-   // items =g_list_append(items,"列表项C");
-   // items =g_list_append(items,"列表项D");
-   // items =g_list_append(items,"列表项E");
+
     //初始化
     gtk_init(&argc,&argv);
     //设置窗口
@@ -219,10 +287,13 @@ int main(int argc,char* argv[])
     gtk_box_pack_start(GTK_BOX(box),box1,FALSE,FALSE,5);
     box2 = gtk_hbox_new(FALSE,0);
     gtk_box_pack_start(GTK_BOX(box),box2,FALSE,FALSE,5);
+    box4 = gtk_hbox_new(FALSE,0);
+    gtk_box_pack_start(GTK_BOX(box),box4,TRUE,TRUE,5);
     sep = gtk_hseparator_new();//分割线
     gtk_box_pack_start(GTK_BOX(box),sep,FALSE,FALSE,5);
     box3 = gtk_hbox_new(FALSE,0);
     gtk_box_pack_start(GTK_BOX(box),box3,TRUE,TRUE,5);
+
 
     //vbox = gtk_vbox_new(FALSE,0);
     //gtk_box_pack_start(GTK_BOX(box),vbox,TRUE,TRUE,5);
@@ -238,19 +309,23 @@ int main(int argc,char* argv[])
     gtk_combo_set_popdown_strings(GTK_COMBO(combo),items);
     //gtk_box_pack_start(GTK_BOX(box1),entry1,FALSE,FALSE,5);
 
-    button = gtk_button_new_with_label("Send");
-    g_signal_connect(G_OBJECT(button),"clicked",G_CALLBACK(on_button_clicked),(gpointer)2);
-    gtk_box_pack_start(GTK_BOX(box3),button,TRUE,TRUE,10);
-    gtk_widget_show(button);
+    pbar = gtk_progress_bar_new();
+    gtk_box_pack_start(GTK_BOX(box4),pbar,TRUE,TRUE,5);
+    gtk_widget_show(pbar);
 
-    button = gtk_button_new_with_label("Cancel");
-    g_signal_connect(G_OBJECT(button),"clicked",G_CALLBACK(on_button_clicked),(gpointer)1);
+    button_send = gtk_button_new_with_label("Send");
+    g_signal_connect(G_OBJECT(button_send),"clicked",G_CALLBACK(on_button_clicked),(gpointer)2);
+    gtk_box_pack_start(GTK_BOX(box3),button_send,TRUE,TRUE,10);
+    gtk_widget_show(button_send);
+
+    button_cancel = gtk_button_new_with_label("Cancel");
+    g_signal_connect(G_OBJECT(button_cancel),"clicked",G_CALLBACK(on_button_clicked),(gpointer)1);
     // g_signal_connect_swapped(G_OBJECT(button),"clicked",G_CALLBACK(gtk_widget_destroy),window);
-    gtk_box_pack_start(GTK_BOX(box3),button,TRUE,TRUE,5);
-
-    gtk_widget_show(button);
+    gtk_box_pack_start(GTK_BOX(box3),button_cancel,TRUE,TRUE,5);
+    gtk_widget_show(button_cancel);
 
     gtk_widget_show_all(window);
+    //gtk_widget_hide(box4);
     gtk_main();
     return FALSE;
 }
