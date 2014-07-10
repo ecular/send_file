@@ -16,6 +16,8 @@
 #define UEVENT_BUFFER_SIZE       2048
 
 GtkWidget* window;
+GtkWidget* button_send;
+GtkWidget* button_cancel;
 
 static int init_hotplug_sock ( void )
 {
@@ -86,6 +88,9 @@ void showMessageBox()
 
 void on_button_clicked (GtkWidget* button,gpointer data)
 {
+	gtk_widget_set_sensitive(button_send,FALSE);
+	gtk_widget_set_sensitive(button_cancel,FALSE);
+	gtk_button_set_label(GTK_BUTTON(button_send),"Sending");
     /*
      *const gchar *gtk_entry_get_text(GtkEntry *entry)
      *     获得当前文本输入构件的内容
@@ -176,7 +181,6 @@ int main(int argc,char* argv[])
     GtkWidget* box2;
     GtkWidget* box3;
     GtkWidget* label1;
-    GtkWidget* button;
     GtkWidget* sep;
     arg_file = argv[1];
 
@@ -243,17 +247,17 @@ int main(int argc,char* argv[])
     gtk_combo_set_popdown_strings(GTK_COMBO(combo),items);
     //gtk_box_pack_start(GTK_BOX(box1),entry1,FALSE,FALSE,5);
 
-    button = gtk_button_new_with_label("Send");
-    g_signal_connect(G_OBJECT(button),"clicked",G_CALLBACK(on_button_clicked),(gpointer)2);
-    gtk_box_pack_start(GTK_BOX(box3),button,TRUE,TRUE,10);
-    gtk_widget_show(button);
+    button_send = gtk_button_new_with_label("Send");
+    g_signal_connect(G_OBJECT(button_send),"clicked",G_CALLBACK(on_button_clicked),(gpointer)2);
+    gtk_box_pack_start(GTK_BOX(box3),button_send,TRUE,TRUE,10);
+    gtk_widget_show(button_send);
 
-    button = gtk_button_new_with_label("Cancel");
-    g_signal_connect(G_OBJECT(button),"clicked",G_CALLBACK(on_button_clicked),(gpointer)1);
+    button_cancel = gtk_button_new_with_label("Cancel");
+    g_signal_connect(G_OBJECT(button_cancel),"clicked",G_CALLBACK(on_button_clicked),(gpointer)1);
     // g_signal_connect_swapped(G_OBJECT(button),"clicked",G_CALLBACK(gtk_widget_destroy),window);
-    gtk_box_pack_start(GTK_BOX(box3),button,TRUE,TRUE,5);
+    gtk_box_pack_start(GTK_BOX(box3),button_cancel,TRUE,TRUE,5);
 
-    gtk_widget_show(button);
+    gtk_widget_show(button_cancel);
 
     gtk_widget_show_all(window);
     gtk_main();
